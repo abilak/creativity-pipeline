@@ -1,0 +1,16 @@
+{
+  "task_id": "history_library_merehaven_practice",
+  "mode": "history",
+  "prompt": "Write a carefully argued interpretation of the March 1812 quay protest in the entirely invented Merehaven practice dossier. Assess the commissioner's explanation against the payroll, petition, clerk's record, copied notice and comparison roll when those documents are actually present in the selected packet. Attribute the commissioner's prejudiced judgments to him; do not turn them into facts about workers. Distinguish recorded actions, a source's allegations, reasonable inferences and unresolved possibilities. Examine how wage timing and collection arrangements might matter without claiming that the dossier proves one complete cause. Identify copying, limited coverage and relevant counterevidence. Use the exact supplied passage IDs as local citations and attach short matching quotations to substantive claim annotations. Do not claim to have read omitted documents. The dossier is invented for software practice, so do not present its people or events as real history.",
+  "target_words": 600,
+  "min_words": 420,
+  "max_words": 800,
+  "source_scope": "Entirely invented practice material: no real archival documents, people, places or events are supplied. This task deliberately has no inline sources and requires explicit --source-library retrieval. The retrieval manifest records which library documents and passages were supplied or omitted.",
+  "sources": [],
+  "commitments": [],
+  "initial_state": {
+    "world": [],
+    "reader": []
+  },
+  "date_constraints": []
+}

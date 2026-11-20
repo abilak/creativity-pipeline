@@ -1,0 +1,10 @@
+{
+  "task_id": "english_apartment",
+  "mode": "english",
+  "prompt": "Write a quiet literary narrative about Mara clearing her estranged father's apartment. Let a practical discovery complicate her view of him. Preserve ambiguity and avoid an explicit concluding moral. Invent a distinctive approach without relying on a surprise letter explaining everything.",
+  "target_words": 700,
+  "commitments": [{"id":"mara_alone", "text":"Mara is alone in the apartment during the story."}],
+  "initial_state": {"world": [], "reader": []},
+  "sources": [],
+  "date_constraints": []
+}

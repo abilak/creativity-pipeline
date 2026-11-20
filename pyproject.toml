@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "creativity-pipeline"
+version = "0.3.0"
+readme = "README.md"
+description = "Local experiments in diverse narratives and evidence-grounded historical writing"
+requires-python = ">=3.10"
+dependencies = ["pydantic>=2.9,<3", "PyYAML>=6,<7"]
+
+[project.optional-dependencies]
+gpu = [
+  "torch>=2.6,<3",
+  "transformers==4.57.1",
+  "peft>=0.17.1,<0.18",
+  "accelerate>=1.10,<2",
+  "bitsandbytes>=0.47,<0.49",
+  "safetensors>=0.5,<1",
+]
+
+[project.scripts]
+creativity = "creativity_pipeline.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

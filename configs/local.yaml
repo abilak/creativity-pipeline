@@ -1,0 +1,41 @@
+# Proposed first configuration for a 20 GB RTX 4000 Ada; not GPU-benchmarked here.
+backend: transformers
+model_id: Qwen/Qwen3-8B
+revision: main
+device: cuda
+load_in_4bit: true
+local_files_only: true
+adapter_path: null
+semantic_critic: true
+# null reuses the writer backbone with its adapter disabled. Set a checkpoint
+# and pinned revision here to load a separate critic sequentially.
+critic_model_id: null
+critic_revision: main
+critic_load_in_4bit: true
+critic_max_context_tokens: null
+strategy: multi_plan
+max_context_tokens: 8192
+max_run_tokens: 90000
+max_output_tokens: 24000
+max_calls: 28
+candidates: 4
+selection_policy: judge
+history_evidence_audit: true
+max_repairs: 2
+schema_retries: 1
+plan_tokens: 1024
+draft_tokens: 3072
+review_tokens: 768
+critic_tokens: 3072
+selection_tokens: 256
+plan_temperature: 0.9
+draft_temperature: 0.75
+review_temperature: 0.3
+nonthinking_top_p: 0.8
+thinking_top_p: 0.95
+top_k: 20
+min_p: 0.0
+thinking_plan: false
+thinking_review: false
+seed: 42
+

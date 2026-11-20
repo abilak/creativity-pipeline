@@ -1,0 +1,24 @@
+# Keep this adapter separate from the narrative adapter.
+# accepted=true records human/curator acceptance, not an automatic truth claim.
+# Include evidence citations and concise inspectable reasoning in completions;
+# never require private thought traces. The chat template disables thinking.
+dataset: ../data/curated/history.jsonl
+mode: history
+model_id: Qwen/Qwen3-8B
+revision: main
+local_files_only: false
+preflight_tokenizer: false
+overlength_policy: error
+max_length: 2048
+lora_rank: 16
+lora_alpha: 32
+lora_dropout: 0.05
+learning_rate: 0.00005
+num_train_epochs: 1.0
+micro_batch_size: 1
+gradient_accumulation_steps: 16
+weight_decay: 0.01
+warmup_ratio: 0.03
+seed: 42
+logging_steps: 10
+save_total_limit: 2

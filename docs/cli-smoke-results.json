@@ -1,0 +1,65 @@
+{
+  "package_version": "0.3.0",
+  "model_inference_executed": false,
+  "commands": [
+    {
+      "command": "--help",
+      "returncode": 0,
+      "expected_returncode": 0
+    },
+    {
+      "command": "demo",
+      "returncode": 0,
+      "expected_returncode": 0
+    },
+    {
+      "command": "demo",
+      "returncode": 0,
+      "expected_returncode": 0
+    },
+    {
+      "command": "build-sources",
+      "returncode": 0,
+      "expected_returncode": 0
+    },
+    {
+      "command": "retrieve-sources",
+      "returncode": 0,
+      "expected_returncode": 0
+    },
+    {
+      "command": "verify-source-quote",
+      "returncode": 0,
+      "expected_returncode": 0
+    },
+    {
+      "command": "critique",
+      "returncode": 0,
+      "expected_returncode": 0
+    },
+    {
+      "command": "evaluate-critic",
+      "returncode": 2,
+      "expected_returncode": 2
+    }
+  ],
+  "english": {
+    "status": "accepted_by_checks",
+    "calls": 12,
+    "review_hashes_match": true,
+    "fixture": true
+  },
+  "history": {
+    "status": "accepted_by_checks",
+    "calls": 12,
+    "review_hashes_match": true,
+    "fixture": true
+  },
+  "sources": {
+    "n_documents": 6,
+    "selected_documents": 6,
+    "exact_quote_verified": true,
+    "truth_or_entailment_established": false
+  },
+  "critic_evaluation": "Demo rejected as intended; actual model evaluation not performed."
+}

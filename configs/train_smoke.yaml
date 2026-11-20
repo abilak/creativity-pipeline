@@ -1,0 +1,24 @@
+# Real two-optimizer-step QLoRA smoke run on human-curated, accepted examples.
+# This file does not supply data. Accepted train AND validation rows are required.
+# Run --dry-run first for an offline data check; omit it to train on the GPU.
+dataset: ../data/curated/english.jsonl
+mode: english
+model_id: Qwen/Qwen3-8B
+revision: main
+local_files_only: false
+preflight_tokenizer: false
+overlength_policy: error
+max_length: 2048
+lora_rank: 16
+lora_alpha: 32
+lora_dropout: 0.05
+learning_rate: 0.00005
+num_train_epochs: 1.0
+max_steps: 2
+micro_batch_size: 1
+gradient_accumulation_steps: 1
+weight_decay: 0.01
+warmup_ratio: 0.0
+seed: 42
+logging_steps: 1
+save_total_limit: 1

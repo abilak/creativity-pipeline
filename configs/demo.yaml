@@ -1,0 +1,11 @@
+backend: demo
+strategy: multi_plan
+candidates: 4
+max_repairs: 1
+schema_retries: 0
+semantic_critic: true
+critic_tokens: 3072
+max_run_tokens: 90000
+max_output_tokens: 24000
+max_context_tokens: 8192
+seed: 42

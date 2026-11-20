@@ -1,0 +1,27 @@
+# Curate data first. Paths are relative to this YAML file, not the shell cwd.
+# Every row follows TrainingExample; only accepted train rows update weights.
+# group_id must join related prompts, source material, paraphrases, and repairs.
+dataset: ../data/curated/english.jsonl
+mode: english
+model_id: Qwen/Qwen3-8B
+# The actual run resolves this to a commit SHA before tokenizer/weights loading.
+revision: main
+local_files_only: false
+# A default --dry-run validates JSONL and split isolation without downloads.
+# Set true only to allow tokenizer/config download for a token-length dry run.
+preflight_tokenizer: false
+# Overlength rows cause a report + error. 'skip' is explicit and logs every ID.
+overlength_policy: error
+max_length: 2048
+lora_rank: 16
+lora_alpha: 32
+lora_dropout: 0.05
+learning_rate: 0.00005
+num_train_epochs: 1.0
+micro_batch_size: 1
+gradient_accumulation_steps: 16
+weight_decay: 0.01
+warmup_ratio: 0.03
+seed: 42
+logging_steps: 10
+save_total_limit: 2

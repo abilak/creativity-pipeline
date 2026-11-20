@@ -1,0 +1,14 @@
+{
+  "task_id": "history_toy_districts",
+  "mode": "history",
+  "prompt": "Using only this explicitly fictional teaching dossier, compare possible explanations for unrest in Alder District. Distinguish what each source asserts from established facts, confront the comparison district, and state what the packet cannot establish. These names and events are invented for software testing; do not present them as real history.",
+  "target_words": 700,
+  "sources": [
+    {"id":"S1","title":"Alder collection office report (fictional)","author":"District collection office","date":"1812","perspective":"Administrative defense of its collection policy; not independently corroborated","text":"The assessment increased in Alder District in 1811. Demonstrations occurred in early 1812. The office reported that collectors followed ordinary procedures."},
+    {"id":"S2","title":"Birch district accounts (fictional)","author":"Birch district clerk","date":"1812","perspective":"Financial summary; does not systematically record informal protest","text":"Birch District recorded a similar assessment increase in 1811. No demonstrations were recorded in these accounts. Collection was spread over three installments."},
+    {"id":"S3","title":"Alder petition (fictional)","author":"A group of petitioners","date":"1812","perspective":"Advocacy document from opponents of collection; representativeness is uncertain","text":"The petitioners complained that collectors demanded immediate payment and treated households unevenly. They asked for installment payments and public rules for collection."}
+  ],
+  "commitments": [],
+  "initial_state": {"world": [], "reader": []},
+  "date_constraints": []
+}
