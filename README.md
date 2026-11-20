@@ -4,7 +4,9 @@ A local research prototype for **creative English prose** and **source-grounded 
 
 **Status:** working orchestration, deterministic checks, an offline demo, a real Transformers inference implementation, and a QLoRA training implementation. The GPU paths must still be exercised on your workstation. Demo text is a fixed fixture, not evidence of model quality. No trained adapters or model weights are included.
 
-**Version 0.3.0:** adds a structured English/history critic, checks on the critic's own quotations and decisions, optional sequential critic-model routing, an auditable local source library, and references generated from supplied metadata. A source's assertion is assessed separately from whether that assertion is true. See [docs/CRITICS_AND_SOURCES.md](docs/CRITICS_AND_SOURCES.md) for examples and limits. The earlier [quality review](docs/QUALITY_REVIEW.md) remains available; current executed checks are recorded in [docs/VALIDATION.md](docs/VALIDATION.md).
+**Version 0.3.1:** repairs material mechanical defects before spending calls on criticism, separates English and history prompt instructions, adds read-only saved-run diagnostics, and can continue from a saved draft with `repair-run`. Citation checks remain strict. See [docs/RUN_RECOVERY.md](docs/RUN_RECOVERY.md) for recovery commands and limits.
+
+The structured English/history critic, optional sequential critic model, source library, and supplied-metadata references introduced in 0.3.0 remain available. A source's assertion is assessed separately from whether that assertion is true. See [docs/CRITICS_AND_SOURCES.md](docs/CRITICS_AND_SOURCES.md) for examples and limits. The earlier [quality review](docs/QUALITY_REVIEW.md) remains available; current executed checks are recorded in [docs/VALIDATION.md](docs/VALIDATION.md).
 
 ## Quick start: no GPU required
 
@@ -71,6 +73,7 @@ The initial GPU settings are 4-bit NF4 weights, double quantization, bf16 comput
 | Plan | Several approaches, event relationships, presentation order, open choices | Several evidence-supported approaches, rival interpretations, uncertainty |
 | Check | Protected IDs, dependencies, presentation references | Source IDs, exact quoted passages, declared dates, dependencies |
 | Select and draft | Develop one approach with room for local invention | Write with claim annotations, citations, and bounded conclusions |
+| Draft checks | Repair material state or annotation defects before reviews | Repair material citation or annotation defects before reviews |
 | Dedicated critic | Development, consequential choices, voice, motivation, structure; preserve successful choices | Attribution, sourcing/context, corroboration, causal reasoning, uncertainty, engagement with sources |
 | General review | Continuity, commitments, reader knowledge, evidence for state additions | Complete draft and annotation consistency, unresolved defects |
 | Repair | Up to two full revisions by default | Up to two full revisions by default |
@@ -78,7 +81,7 @@ The initial GPU settings are 4-bit NF4 weights, double quantization, bf16 comput
 
 The dedicated critic receives the raw prose and task/source context with the writer's annotations, plan, and earlier reviews hidden. Its report includes domain rubric judgments, exact quoted draft spans, source assessments and evidence findings for history, concrete issues, revision priorities, and choices to preserve. The runner checks the critic's quotations and report consistency before using its advice. A materially invalid critic report stops as `needs_review`; its unsupported criticism is not sent to the writer as a repair instruction.
 
-Every repair receives a fresh critic report and general review. Both required judgments must accept the current text, with complete critic coverage and no material findings. Material issues cannot be canceled by praise or another model's acceptance. Reviews use the base model with the writing adapter disabled by default; this remains a correlated judge. With `semantic_critic: false`, history can use the earlier `history_evidence_audit` instead. The default does not add that legacy audit as a redundant third reviewer.
+Every repaired draft is checked again. Material mechanical findings go directly to bounded repair; if no repairs remain, the draft is retained as `needs_review` without spending further review calls. Mechanical and editorial repairs share the same `max_repairs` limit. Once the mechanical checks pass, the current text receives fresh criticism and general review. Both required judgments must accept it, with complete critic coverage and no material findings. Material issues cannot be canceled by praise or another model's acceptance. Reviews use the base model with the writing adapter disabled by default; this remains a correlated judge. With `semantic_critic: false`, history can use the earlier `history_evidence_audit` instead. The default does not add that legacy audit as a redundant third reviewer.
 
 The selector sees shuffled, aliased candidates without previous reviewer praise. `selection_policy: sample` chooses uniformly among accepted plans with a recorded seed, providing an ablation for whether judged selection narrows variety. This is a testable alternative, not a promised quality improvement. Malformed candidate or candidate-review responses are logged and skipped after bounded retries; already accepted plans survive. Backend errors and global budget exhaustion still halt the run.
 
@@ -95,6 +98,14 @@ Unaccepted drafts remain available for inspection. Failed drafts do not commit n
 
 ## Inspect a run
 
+Read the existing logs without importing Torch or loading a model:
+
+```bash
+python scripts/inspect_run.py --latest runs
+```
+
+Check the printed `selected_run`. To choose a particular run, use `python scripts/inspect_run.py runs/english-base-001`. The report includes status/error, actual supplied source IDs, recorded hardware, call roles, completion reasons, and timing. It omits source text, draft prose, prompts, and model responses; inspect original logs locally when deeper analysis requires them.
+
 | File | Contents |
 |---|---|
 | `final.txt` | Last complete structured draft's prose, when one exists |
@@ -108,8 +119,20 @@ Unaccepted drafts remain available for inspection. Failed drafts do not commit n
 | `source_selection.json` | When retrieval is requested: selected and omitted passages, exact offsets, hashes, queries, and known limits |
 | `references.json`, `references.txt` | History references using supplied metadata, unresolved source IDs, and uncited supplied sources |
 | `state.json` | Accepted accumulated English state, or unchanged initial state on failure |
+| `continuation.json`, `input_draft.json` | For `repair-run`: parent provenance and the saved draft used as input |
 
 All generated tokens, including reasoning and malformed JSON attempts, count toward the measured budget. A backend exception can leave work unmeasurable; such a run records incomplete token accounting instead of inventing a count. Logs include source text and model outputs, so treat them as part of your research data.
+
+### Continue from a saved draft
+
+After diagnosing the stopping error, reuse an existing final draft in a new output directory:
+
+```bash
+creativity repair-run runs/english-base-001 \
+  --output runs/english-repair-001
+```
+
+This inherits the saved configuration by default; `--config configs/local.yaml` selects an explicit replacement configuration. It reuses the saved task, source packet, retrieval manifest, selected plan when available, and complete `final.json`. It verifies the prose against the original output hash and `final.txt`, skips planning and initial drafting, and discards all previous approvals. A new run has its own bounded budget; parent costs are retained separately. Repeated continuations add compute and are not part of a single original budget. Continuations use a separate `repair_run` evaluation baseline. See [docs/RUN_RECOVERY.md](docs/RUN_RECOVERY.md).
 
 ## Write your own tasks
 

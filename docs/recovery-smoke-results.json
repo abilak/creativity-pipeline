@@ -1,0 +1,33 @@
+{
+  "pipeline_version": "0.3.1",
+  "installed_version": "0.3.1",
+  "note": "Offline CLI fixtures; no real model generation or GPU quality/throughput test.",
+  "runs": [
+    {
+      "mode": "english",
+      "fixture": true,
+      "parent_status": "accepted_by_checks",
+      "continuation_status": "accepted_by_checks",
+      "continuation_roles": [
+        "semantic_critic",
+        "review_draft"
+      ],
+      "continuation_calls": 2,
+      "matching_final_review_hashes": true,
+      "diagnostic_warnings": []
+    },
+    {
+      "mode": "history",
+      "fixture": true,
+      "parent_status": "accepted_by_checks",
+      "continuation_status": "accepted_by_checks",
+      "continuation_roles": [
+        "semantic_critic",
+        "review_draft"
+      ],
+      "continuation_calls": 2,
+      "matching_final_review_hashes": true,
+      "diagnostic_warnings": []
+    }
+  ]
+}

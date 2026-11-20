@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import random
 import time
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 from uuid import uuid4
 from pydantic import ValidationError
 
@@ -16,6 +16,9 @@ from .interfaces import Backend, GenerationRequest
 from .io import atomic_json, parse_json_object, text_hash
 from .models import Draft, Model, Plan, Review, Selection, Settings, State, Task
 from .prompts import messages
+
+if TYPE_CHECKING:
+    from .recovery import SavedRun
 
 T = TypeVar("T", bound=Model)
 
@@ -298,8 +301,19 @@ class Pipeline:
             atomic_json(self.output_dir / "assessment.json", result)
         return result
 
-    def run(self, task: Task) -> dict:
-        """Write one exclusive run directory. Never overwrite an earlier experiment."""
+    def run(self, task: Task, *, saved_run: SavedRun | None = None) -> dict:
+        """Write an exclusive run, optionally continuing a verified saved draft.
+
+        A continuation skips planning and initial drafting, discards all earlier
+        approvals, and has its own bounded budget. It never changes its parent.
+        """
+        if saved_run is not None:
+            saved_run.verify()
+            if saved_run.task != task:
+                raise ValueError("A continuation must use the exact saved task and source packet")
+            if self.source_manifest is not None and self.source_manifest != saved_run.source_manifest:
+                raise ValueError("A continuation must use the exact saved source-selection manifest")
+            self.source_manifest = saved_run.source_manifest
         self.output_dir.mkdir(parents=True, exist_ok=False)
         self._task = task
         started = time.perf_counter()
@@ -310,11 +324,25 @@ class Pipeline:
         summary = {"pipeline_version": __version__, "run_id": self.run_id, "task_id": task.task_id, "mode": task.mode, "strategy": self.settings.strategy,
                    "backend": self.backend.describe(), "status": "failed", "is_fixture": self.settings.backend == "demo",
                    "error": None, "final_issues": [], "review_label_meaning": "Fallible model and mechanical checks, not human approval or certified truth"}
+        if saved_run is not None:
+            summary.update(strategy="repair_run", continuation=saved_run.provenance,
+                           is_fixture=summary["is_fixture"] or saved_run.provenance["parent_is_fixture"])
+            atomic_json(self.output_dir / "continuation.json", saved_run.provenance)
+            atomic_json(self.output_dir / "input_draft.json", saved_run.draft.model_dump())
         final_state = task.initial_state.model_dump()
         try:
-            plan, candidates = self._plans(task)
-            summary["accepted_plan_count"] = len(candidates)
-            draft = self._call("draft", Draft, max_new_tokens=self.settings.draft_tokens, plan=plan)
+            if saved_run is None:
+                plan, candidates = self._plans(task)
+                summary["accepted_plan_count"] = len(candidates)
+                draft = self._call("draft", Draft, max_new_tokens=self.settings.draft_tokens, plan=plan)
+            else:
+                plan, draft = saved_run.plan, saved_run.draft
+                summary["accepted_plan_count"] = 0
+                summary["reused_selected_plan"] = plan is not None
+                if plan is not None:
+                    atomic_json(self.output_dir / "selected_plan.json", plan)
+                self._event("saved_draft_loaded", parent_run_id=saved_run.provenance["parent_run_id"],
+                            output_sha256=text_hash(draft.text), reused_selected_plan=plan is not None)
             self._draft = draft
             for revision in range(self.settings.max_repairs + 1):
                 atomic_json(self.output_dir / f"draft_{revision:02d}.json", draft.model_dump())
@@ -329,6 +357,23 @@ class Pipeline:
                 summary["critic_validation"] = None
                 mechanical = self._draft_findings(task, draft, plan)
                 summary["final_issues"] = mechanical
+                self._event("draft_checks", revision=revision, findings=mechanical,
+                            output_sha256=text_hash(draft.text))
+                if any(issue["severity"] == "material" for issue in mechanical):
+                    can_repair = revision < self.settings.max_repairs
+                    self._event("reviews_skipped", revision=revision,
+                                reason="material_mechanical_defects", repair_available=can_repair,
+                                output_sha256=text_hash(draft.text))
+                    if not can_repair:
+                        summary["status"] = "needs_review"
+                        summary["error"] = "Material mechanical defects remain and the repair limit is exhausted; semantic reviews were not run on this draft."
+                        break
+                    self._event("repair_requested", revision=revision, reason="mechanical_checks",
+                                defects=mechanical, output_sha256=text_hash(draft.text))
+                    draft = self._call("repair", Draft, max_new_tokens=self.settings.draft_tokens,
+                                       plan=plan, draft=draft.model_dump(), defects=mechanical)
+                    self._draft = draft
+                    continue
                 audit = None
                 critic = None
                 critic_issues = []
@@ -386,6 +431,8 @@ class Pipeline:
                                          "message": "Use these concrete priorities while preserving effective choices unless they cause a material defect.",
                                          "revision_priorities": critic.model_dump().get("revision_priorities", []),
                                          "preserve": critic.model_dump().get("preserve", [])})
+                self._event("repair_requested", revision=revision, reason="editorial_reviews",
+                            defects=repair_notes, output_sha256=text_hash(draft.text))
                 draft = self._call("repair", Draft, max_new_tokens=self.settings.draft_tokens,
                                    plan=plan, draft=draft.model_dump(), defects=repair_notes or [{"message": "Reviewer requested revision without an explicit issue; re-evaluate the draft carefully."}])
                 self._draft = draft

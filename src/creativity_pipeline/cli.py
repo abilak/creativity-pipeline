@@ -143,6 +143,21 @@ def _generate(args):
     return 0 if summary["status"] == "accepted_by_checks" else 2
 
 
+def _repair_run(args):
+    from .pipeline import Pipeline
+    from .recovery import load_saved_run
+    saved = load_saved_run(args.run)
+    # JSON is also YAML; the ordinary settings loader preserves all saved caps
+    # and resolves optional command-line overrides without changing task data.
+    if args.config is None:
+        args.config = str(saved.config_path)
+    settings = _settings(args)
+    result = Pipeline(_backend(settings), settings, Path(args.output).expanduser(),
+                      source_manifest=saved.source_manifest).run(saved.task, saved_run=saved)
+    _print(result)
+    return 0 if result["status"] == "accepted_by_checks" else 2
+
+
 def _build_sources(args):
     from .sources import build_source_library
     report = build_source_library(Path(args.path).expanduser(), Path(args.output).expanduser(),
@@ -327,6 +342,11 @@ def _run_records(paths):
         task = Task.model_validate(task).model_dump()
         if summary["task_id"] != task["task_id"] or summary["mode"] != task["mode"]:
             raise ValueError("Run summary identity disagrees with the saved task")
+        continuation = summary.get("continuation")
+        if continuation:
+            configuration = {**configuration,
+                             "continuation_parent_condition_id": continuation["parent_condition"]["condition_id"],
+                             "continuation_parent_strategy": continuation["parent_strategy"]}
         return {
             "output_id": f"{summary['task_id']}--{summary['run_id']}",
             "task_id": summary["task_id"], "mode": summary["mode"],
@@ -337,6 +357,7 @@ def _run_records(paths):
             "condition_id": condition_identity(configuration, summary["backend"]),
             "task": task,
             "task_sha256": text_hash(json.dumps(task, ensure_ascii=False, sort_keys=True, separators=(",", ":"))),
+            **({"continuation": continuation} if continuation else {}),
         }
 
     for value in paths:
@@ -498,8 +519,8 @@ def _export_training(args):
     return 0
 
 
-def _inference_arguments(parser):
-    parser.add_argument("--config", help="YAML settings; defaults to built-in local settings")
+def _inference_arguments(parser, *, config_help="YAML settings; defaults to built-in local settings"):
+    parser.add_argument("--config", help=config_help)
     parser.add_argument("--allow-download", action="store_true", help="Allow model/tokenizer downloads instead of requiring cached files")
     parser.add_argument("--adapter", help="Optional trained PEFT adapter directory")
     parser.add_argument("--seed", type=int)
@@ -532,6 +553,11 @@ def parser():
     _inference_arguments(generate)
     _source_arguments(generate)
     generate.set_defaults(func=_generate)
+    repair = sub.add_parser("repair-run", help="Review and repair a saved final draft in a new run; skip planning and drafting")
+    repair.add_argument("run", help="Existing run directory with task.json, final.json, final.txt, and summary.json")
+    repair.add_argument("--output", required=True, help="New run directory; the original run is never overwritten")
+    _inference_arguments(repair, config_help="YAML or JSON settings; defaults to the saved run's config.json")
+    repair.set_defaults(func=_repair_run)
     critique = sub.add_parser("critique", help="Assess a supplied draft without generating or rewriting it")
     critique.add_argument("task")
     critique.add_argument("--draft", required=True, help="UTF-8 plain text draft")
