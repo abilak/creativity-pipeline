@@ -1,11 +1,12 @@
 # Validation record
 
-Validation for **version 0.3.1**, including early mechanical repair, domain-specific prompts, saved-draft continuation, and read-only run diagnostics.
+Validation for **version 0.3.2**, including explicit required critic fields, structured schema-retry feedback, early mechanical repair, saved-draft continuation, and read-only run diagnostics.
 
 ## Executed in the development environment
 
 - Python 3.12.14, Pydantic 2.13.4, PyYAML 6.0.3.
-- **332 tests passed; five optional real-library tests were skipped** because their dependencies are absent. There are 337 tests in total. The full output is in `test-results.txt`.
+- **340 tests passed; five optional real-library tests were skipped** because their dependencies are absent. There are 345 tests in total. The full output is in `test-results.txt`.
+- Eight new schema-retry regressions reproduce a normally finished critic response missing `missing_evidence`, require explicit model correction, preserve failed-call accounting, fail safely on repeated omission, retain historical abstention, and recover a saved five-call failed run without repeating planning or drafting. Nested errors do not echo invalid input values. Many-error feedback is capped with an accurate omitted-error count, and fixing the missing key cannot bypass fabricated-quote or historical-coverage validation.
 - New routing regressions reproduce missing claim spans and fabricated source IDs, repair them before critic calls, retain a shared repair cap, stop on persistent defects, and verify that old approvals cannot survive an invalid later revision. Prompt regressions distinguish source-free English fiction, dated fiction, supplied literary sources, and historical evidence.
 - Recovery regressions verify that a saved draft skips planning/drafting, preserves its source packet and retrieval manifest, rejects mismatched hashes and in-memory mutations, discards old approvals, uses the original initial state, retains fixture labels, refuses overwrites, and separates continuation provenance and costs from fresh generation.
 - The standalone diagnostic script runs under `python -I -S` without site packages. Tests cover actual event keys, bounded/redacted output, interrupted logs, missing/corrupt files, automatic selection, symlink boundaries, and unchanged run-file bytes and modification times.
@@ -52,7 +53,7 @@ result.
 
 1. Install the optional CUDA stack and verify `creativity doctor --check-cuda`.
    Run the five optional real-library tests; skips must not be treated as successful execution.
-2. Diagnose the user's already completed generation from its saved status/error and per-call records. Exercise the revised recovery path on the actual GPU and measure token counts, elapsed time, peak memory, and JSON adherence. The reported annotation errors are real observations; the omitted stopping error and actual hardware remain unverified here.
+2. Exercise version 0.3.2's recovery path on the actual GPU and measure token counts, elapsed time, peak memory, and JSON adherence. The user's diagnostics now establish repeated `missing_evidence` omissions in normally finished critic responses; this is distinct from output truncation. The revised instructions have passed software-contract tests but have not yet been exercised with that real model here.
 3. Run `evaluate-critic` on the synthetic development cases, inspect evidence findings and false positives, then assess new real source packets with knowledgeable human readers. Compare any separate critic against the shared-backbone default using measured cost and failures.
 4. Supply a curated, grouped training/validation dataset; run offline and tokenizer preflights.
 5. Execute the two-optimizer-step GPU smoke configuration and inspect its report.
