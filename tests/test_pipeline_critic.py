@@ -58,6 +58,101 @@ class CriticPipelineTests(unittest.TestCase):
         self.assertEqual(len(backend.requests), 3)
         self.assertEqual(result["tokens"]["output_tokens"], 120)
 
+    def test_bad_history_annotations_are_repaired_before_any_semantic_review(self):
+        task, final = history_task(), historical_draft()
+        first = json.loads(json.dumps(final))
+        first["text"] += " An unsupported addition. [S6]"
+        first["claims"][0]["text"] = "This wording never appears in the draft."
+        first["claims"][0]["support_quotes"] = [{"source_id": "S6", "quote": "An invented quotation."}]
+        result, backend = self.run_script([
+            Reply("draft", first), Reply("repair", final),
+            Reply("semantic_critic", report(task, final["text"])), Reply("review_draft", review()),
+        ], task=task)
+        self.assertEqual(result["status"], "accepted_by_checks", result["error"])
+        self.assertEqual([request.role for request in backend.requests],
+                         ["draft", "repair", "semantic_critic", "review_draft"])
+        self.assertEqual(result["repairs"], 1)
+        repair = backend.requests[1]
+        self.assertTrue({"claim_text_missing", "quote_source_not_cited", "unknown_quote_source"}
+                        <= {issue["code"] for issue in repair.metadata["defects"]})
+        self.assertEqual(backend.requests[2].metadata["draft"], {"text": final["text"]})
+        self.assertEqual(result["critic_reviewed_output_sha256"], text_hash(final["text"]))
+        self.assertFalse((self.root / "run/critic_00.json").exists())
+        self.assertTrue((self.root / "run/critic_01.json").exists())
+        events = [json.loads(line) for line in (self.root / "run/events.jsonl").read_text().splitlines()]
+        skipped = next(event for event in events if event["kind"] == "reviews_skipped")
+        self.assertEqual(skipped["reason"], "material_mechanical_defects")
+        self.assertTrue(skipped["repair_available"])
+        self.assertEqual(skipped["output_sha256"], text_hash(first["text"]))
+        self.assertEqual([event["reason"] for event in events if event["kind"] == "repair_requested"],
+                         ["mechanical_checks"])
+
+    def test_repeated_mechanical_failures_use_only_the_bounded_repair_budget(self):
+        task, invalid = english_task(), draft("W1", "Mara had two keys.")
+        result, backend = self.run_script([
+            Reply("draft", invalid), Reply("repair", invalid), Reply("repair", invalid),
+        ], task=task, max_repairs=2)
+        self.assertEqual(result["status"], "needs_review", result["error"])
+        self.assertIn("repair limit is exhausted", result["error"])
+        self.assertEqual([request.role for request in backend.requests], ["draft", "repair", "repair"])
+        self.assertEqual(result["repairs"], 2)
+        self.assertEqual(result["tokens"]["calls"], 3)
+        self.assertIn("state_overwrite", {issue["code"] for issue in result["final_issues"]})
+        self.assertIsNone(result["final_critic"])
+        self.assertIsNone(result["final_review"])
+        self.assertEqual(load_json(self.root / "run/final.json")["text"], invalid["text"])
+        self.assertEqual(load_json(self.root / "run/state.json"), task.initial_state.model_dump())
+
+    def test_zero_repair_limit_does_not_spend_a_critic_call_on_mechanical_failure(self):
+        invalid = draft("W1", "Mara had two keys.")
+        result, backend = self.run_script([Reply("draft", invalid)], max_repairs=0)
+        self.assertEqual(result["status"], "needs_review")
+        self.assertEqual([request.role for request in backend.requests], ["draft"])
+        self.assertEqual(result["repairs"], 0)
+        self.assertIsNone(result["final_critic"])
+        self.assertIsNone(result["reviewed_output_sha256"])
+
+    def test_minor_mechanical_findings_still_receive_semantic_reviews(self):
+        task, item = english_task(), draft()
+        result, backend = self.run_script([
+            Reply("draft", item), Reply("semantic_critic", report(task, item["text"])),
+            Reply("review_draft", review()),
+        ], task=task)
+        self.assertIn("target_length_deviation", {issue["code"] for issue in result["final_issues"]})
+        self.assertEqual(result["status"], "accepted_by_checks", result["error"])
+        self.assertEqual([request.role for request in backend.requests], ["draft", "semantic_critic", "review_draft"])
+
+    def test_mechanical_and_editorial_repairs_share_the_same_limit(self):
+        task, invalid, final = english_task(), draft("W1", "Mara had two keys."), draft()
+        issue = {"code": "motivation_gap", "message": "This action needs a motive.",
+                 "severity": "material", "location": final["text"]}
+        result, backend = self.run_script([
+            Reply("draft", invalid), Reply("repair", final),
+            Reply("semantic_critic", report(task, final["text"], decision="revise", issues=[issue])),
+            Reply("review_draft", review()),
+        ], task=task, max_repairs=1)
+        self.assertEqual(result["status"], "needs_review", result["error"])
+        self.assertEqual(result["repairs"], 1)
+        self.assertEqual([request.role for request in backend.requests].count("repair"), 1)
+        self.assertIn(issue, result["final_issues"])
+        self.assertEqual(load_json(self.root / "run/state.json"), task.initial_state.model_dump())
+
+    def test_mechanically_invalid_editorial_repair_cannot_inherit_old_reviews(self):
+        task, first, invalid = english_task(), draft(), draft("W1", "Mara had two keys.")
+        result, backend = self.run_script([
+            Reply("draft", first), Reply("semantic_critic", report(task, first["text"])),
+            Reply("review_draft", review("revise")), Reply("repair", invalid),
+        ], task=task, max_repairs=1)
+        self.assertEqual(result["status"], "needs_review", result["error"])
+        self.assertEqual(result["output_sha256"], text_hash(invalid["text"]))
+        self.assertIsNone(result["final_critic"])
+        self.assertIsNone(result["final_review"])
+        self.assertIsNone(result["critic_reviewed_output_sha256"])
+        self.assertIsNone(result["reviewed_output_sha256"])
+        self.assertEqual([request.role for request in backend.requests],
+                         ["draft", "semantic_critic", "review_draft", "repair"])
+        self.assertEqual(load_json(self.root / "run/state.json"), task.initial_state.model_dump())
+
     def test_critic_material_issue_cannot_be_overridden_by_general_accept(self):
         task, item = english_task(), draft()
         issue = {"code": "motivation_gap", "message": "The locked door conflicts with the established purpose.",

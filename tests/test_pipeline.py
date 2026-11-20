@@ -179,14 +179,14 @@ class PipelineIntegrationTests(unittest.TestCase):
         self.assertEqual(load_json(output / "state.json"), task.initial_state.model_dump())
         self.assertEqual([r.role for r in backend.requests].count("review_draft"), 2)
 
-    def test_accept_cannot_override_material_mechanical_findings(self):
+    def test_material_mechanical_findings_stop_before_review_when_repairs_exhausted(self):
         task = english_task()
-        summary, _, output = self.run_script([
+        summary, backend, output = self.run_script([
             Reply("draft", draft("W1", "Mara had two keys.")),
-            Reply("review_draft", review()),
         ], task=task, config=settings(max_repairs=0))
         self.assertEqual(summary["status"], "needs_review")
-        self.assertEqual(summary["final_review"]["decision"], "accept")
+        self.assertIsNone(summary["final_review"])
+        self.assertEqual([request.role for request in backend.requests], ["draft"])
         findings = [i for i in summary["final_issues"] if i["code"] == "state_overwrite"]
         self.assertEqual(len(findings), 1, "A single mechanical finding must not be duplicated by the runner")
         self.assertEqual(findings[0]["severity"], "material")
@@ -393,14 +393,15 @@ class PipelineIntegrationTests(unittest.TestCase):
         self.assertEqual(selected[0], selected[1])
         self.assertIn(selected[0], {"P1", "P2", "P3"})
 
-    def test_explicit_length_minimum_cannot_be_overridden_by_accept(self):
+    def test_explicit_length_minimum_stops_before_review_when_repairs_exhausted(self):
         task = Task.model_validate({**english_task().model_dump(), "min_words": 80})
-        summary, _, output = self.run_script([
-            Reply("draft", draft()), Reply("review_draft", review()),
+        summary, backend, output = self.run_script([
+            Reply("draft", draft()),
         ], task=task, config=settings(max_repairs=0))
         self.assertEqual(summary["word_count"], 4)
         self.assertEqual(summary["status"], "needs_review")
-        self.assertEqual(summary["final_review"]["decision"], "accept")
+        self.assertIsNone(summary["final_review"])
+        self.assertEqual([request.role for request in backend.requests], ["draft"])
         self.assertTrue(any(issue["code"] == "below_min_words" and issue["severity"] == "material" for issue in summary["final_issues"]))
         self.assertEqual(load_json(output / "state.json"), task.initial_state.model_dump())
 
