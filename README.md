@@ -4,7 +4,7 @@ A local research prototype for **creative English prose** and **source-grounded 
 
 **Status:** working orchestration, deterministic checks, an offline demo, a real Transformers inference implementation, and a QLoRA training implementation. The GPU paths must still be exercised on your workstation. Demo text is a fixed fixture, not evidence of model quality. No trained adapters or model weights are included.
 
-**Version 0.3.1:** repairs material mechanical defects before spending calls on criticism, separates English and history prompt instructions, adds read-only saved-run diagnostics, and can continue from a saved draft with `repair-run`. Citation checks remain strict. See [docs/RUN_RECOVERY.md](docs/RUN_RECOVERY.md) for recovery commands and limits.
+**Version 0.3.2:** makes every required critic field explicit, including `missing_evidence: []` when appropriate, and gives schema retries bounded field-level correction instructions. Missing fields are still rejected; no evidence declaration is silently filled in. Version 0.3.1's early mechanical repairs, domain-specific prompts, read-only diagnostics, and saved-draft `repair-run` remain available. See [docs/RUN_RECOVERY.md](docs/RUN_RECOVERY.md) for recovery commands and limits.
 
 The structured English/history critic, optional sequential critic model, source library, and supplied-metadata references introduced in 0.3.0 remain available. A source's assertion is assessed separately from whether that assertion is true. See [docs/CRITICS_AND_SOURCES.md](docs/CRITICS_AND_SOURCES.md) for examples and limits. The earlier [quality review](docs/QUALITY_REVIEW.md) remains available; current executed checks are recorded in [docs/VALIDATION.md](docs/VALIDATION.md).
 

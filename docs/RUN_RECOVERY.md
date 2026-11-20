@@ -2,6 +2,8 @@
 
 Version 0.3.1 addresses a confirmed ordering problem in 0.3.0: a draft could have material mechanical errors, then fail during critic generation before the writer ever received the known repair instructions. A real run reported mismatched claim spans, unknown source IDs S6/S7, zero repairs, no completed critic report, and about 63 minutes elapsed. Its pasted tail did not include the stopping error or task mode. That evidence identifies invalid annotations; it does not establish why the critic stopped or how fast the GPU decoded.
 
+Version 0.3.2 addresses a subsequently observed critic-output failure: two normally finished critic responses omitted the required `missing_evidence` field. The prompt now explicitly requires every top-level key, explains `missing_evidence: []` when nothing is missing, and requires substantive missing requirements for abstention. Schema retries name field paths, types, and relevant field instructions without echoing Pydantic input-value payloads. Error detail is bounded, with omitted-error counts reported; the original task, draft, and source packet remain intact. Missing fields are not silently defaulted, and retry limits, token accounting, evidence validation, and review gates are unchanged.
+
 ## Read the existing records first
 
 From the project directory:
@@ -19,6 +21,8 @@ python scripts/inspect_run.py runs/the-failed-run
 This is a standalone standard-library script. It does not import Torch, load a tokenizer, download weights, generate text, or modify the run. It reports the last 12 calls by default and marks omitted or unreadable records. Prompts, source passages, draft prose, model responses, and Pydantic input-value payloads are excluded. Error details and output sizes are bounded.
 
 The important fields are `status`, `error`, `task_mode`, supplied source IDs, and the request/response sequence. A `finish_reason` of `length` establishes that a particular response did not finish within its limit. A context-admission error means the requested prompt plus reserved output would exceed the configured context. Schema errors identify an output-contract problem. These require different remedies; a larger token limit is not a universal fix.
+
+For `CriticReport` / `missing_evidence: missing`, update to 0.3.2 and use `repair-run` on the failed run. The observed responses stopped normally after 560 and 520 tokens with a 3072-token allowance; their stopping condition does not indicate output truncation. Keep the working model and GPU configuration for the first recovery attempt. This patch improves the contract and retry instructions but does not guarantee that an unconstrained model will obey them on every attempt. A repeated omission still stops without approving the draft. A logged `backend_slot: writer` means the critic role used the writer checkpoint; it is not evidence that a separate critic model was loaded.
 
 The CUDA information in `summary.backend` describes the saved run. To inspect the currently allocated hardware separately:
 
@@ -81,7 +85,13 @@ Original files are never rewritten, and an existing output directory is rejected
 
 ## Updating an existing server checkout
 
-Keep the working virtual environment, existing `configs`, tasks, sources, adapters, and `runs`. The 0.3.1 code changes do not require another Torch/CUDA installation. Back up locally edited code before copying the archive's updated `src`, `scripts`, and `pyproject.toml` into the checkout. Update documentation and tests as desired.
+Keep the working virtual environment, existing `configs`, tasks, sources, adapters, and `runs`. These code changes do not require another Torch/CUDA installation. For a clean checkout tracking the published `main` branch, update through Git:
+
+```bash
+git pull --ff-only origin main
+```
+
+If Git reports local modifications or divergent history, inspect and preserve that work before proceeding; do not discard it with a hard reset.
 
 With the existing environment activated, refresh only the editable project:
 
@@ -91,4 +101,4 @@ python -c 'import creativity_pipeline; print(creativity_pipeline.__version__)'
 python scripts/inspect_run.py --latest runs
 ```
 
-The version should be `0.3.1`. The editable install uses the environment's existing setuptools/wheel and dependencies; it does not intentionally upgrade the working GPU stack. Diagnose the earlier critic failure before choosing a new expensive attempt.
+The version should be `0.3.2`. The editable install uses the environment's existing setuptools/wheel and dependencies; it does not intentionally upgrade the working GPU stack. Inspect `selected_run` before starting recovery, and choose a new output directory. The saved run's configuration is reused unless explicitly overridden.

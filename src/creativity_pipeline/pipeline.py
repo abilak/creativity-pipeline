@@ -33,6 +33,47 @@ class GenerationFormatError(RunHalted):
     """A bounded proposal failed its output contract; backend/budget still usable."""
 
 
+def _schema_retry_message(error: ValueError, expected: type[Model]) -> str:
+    """Give bounded field-level feedback without echoing invalid input values."""
+    schema = expected.model_json_schema()
+    details: dict = {"schema": expected.__name__,
+                     "required_top_level_fields": schema.get("required", [])}
+    if isinstance(error, ValidationError):
+        failures = error.errors(include_input=False, include_url=False, include_context=False)
+        details["errors"] = []
+        details["omitted_error_count"] = len(failures)
+        for failure in failures[:8]:
+            path = [part[:120] if isinstance(part, str) else part
+                    for part in failure["loc"][:12]]
+            item = {"path": path, "type": failure["type"], "message": failure["msg"][:240]}
+            if len(failure["loc"]) > 12:
+                item["omitted_path_components"] = len(failure["loc"]) - 12
+            if len(failure["loc"]) == 1:
+                field = schema.get("properties", {}).get(failure["loc"][0], {})
+                if "type" in field:
+                    item["expected_type"] = field["type"]
+                if field.get("items", {}).get("type"):
+                    item["item_type"] = field["items"]["type"]
+                if "description" in field:
+                    item["field_instruction"] = field["description"][:420]
+            details["errors"].append(item)
+            details["omitted_error_count"] = len(failures) - len(details["errors"])
+            if len(json.dumps(details, ensure_ascii=False, separators=(",", ":"))) > 2400:
+                details["errors"].pop()
+                details["omitted_error_count"] += 1
+                break
+    else:
+        details["error"] = str(error)[:600]
+    return (
+        "The previous attempt failed validation. Correct the field paths and types below; "
+        "include every required top-level field, even when its permitted value is an empty list. "
+        "Use the original task, sources, and draft to determine the values. Do not invent "
+        "evidence or erase substantive findings to satisfy the schema. Return a fresh complete "
+        "JSON object, not a patch or a partial answer. Keep it compact.\nValidation details:\n"
+        + json.dumps(details, ensure_ascii=False, separators=(",", ":"))
+    )
+
+
 class Budget:
     """Admission reserves a full request; accounting includes malformed generations."""
     def __init__(self, settings: Settings):
@@ -100,10 +141,11 @@ class Pipeline:
         assert self._task is not None
         prompt_messages = messages(role, self._task, **kwargs)
         last_error = ""
+        retry_message = ""
         for retry in range(self.settings.schema_retries + 1):
             current = list(prompt_messages)
-            if last_error:
-                current.append({"role": "user", "content": "The previous attempt failed validation: " + last_error[:1200] + ". Return a fresh complete JSON object that obeys the schema. Keep it compact; do not omit substantive evidence."})
+            if retry_message:
+                current.append({"role": "user", "content": retry_message})
             thinking = (self.settings.thinking_plan if role == "plan" else
                         self.settings.thinking_review if role.startswith("review") else False)
             temperature = (self.settings.plan_temperature if role == "plan" else
@@ -155,6 +197,7 @@ class Pipeline:
             except (ValueError, ValidationError) as exc:
                 last_error = str(exc)
                 self._event("schema_error", call_id=call_id, error=last_error)
+                retry_message = _schema_retry_message(exc, expected)
         raise GenerationFormatError(f"{role} did not produce a valid complete {expected.__name__}: {last_error[:500]}")
 
     def _plans(self, task: Task):
